@@ -1,57 +1,53 @@
 import streamlit as st
-import pandas as pd
-from textblob import TextBlob
+import nltk
+from nltk import NaiveBayesClassifier
+from nltk.classify import apply_features
+from joblib import load
 
-# Function to clean lyrics
-def clean_lyrics(text):
-    return text.replace("\n", "")
+# Download NLTK resources if not already downloaded
+nltk.download('names')
 
-# Function to perform sentiment analysis
-def analyze_sentiment(lyric):
-    tb = TextBlob(lyric)
-    sentiment = tb.sentiment.polarity
-    subjectivity = tb.sentiment.subjectivity
-    return sentiment, subjectivity
+# Function to extract features from a name
+def extract_gender_features(name):
+    name = name.lower()
+    features = {
+        "suffix": name[-1:],
+        "suffix2": name[-2:] if len(name) > 1 else name[0],
+        "suffix3": name[-3:] if len(name) > 2 else name[0],
+        "suffix4": name[-4:] if len(name) > 3 else name[0],
+        "suffix5": name[-5:] if len(name) > 4 else name[0],
+        "suffix6": name[-6:] if len(name) > 5 else name[0],
+        "prefix": name[:1],
+        "prefix2": name[:2] if len(name) > 1 else name[0],
+        "prefix3": name[:3] if len(name) > 2 else name[0],
+        "prefix4": name[:4] if len(name) > 3 else name[0],
+        "prefix5": name[:5] if len(name) > 4 else name[0]
+    }
+    return features
+
+# Load the trained Naive Bayes classifier
+bayes = load('gender_prediction.joblib')
 
 # Streamlit app
 def main():
-    st.title('Lyrics Sentiment Analysis')
-    st.write('Upload an Excel file with a "text" column containing song lyrics.')
+    st.title('Gender Prediction App')
+    st.write('Enter a name to predict its gender.')
 
-    # File upload
-    uploaded_file = st.file_uploader("Upload an Excel file", type=['xlsx', 'xls'])
-
-    if uploaded_file is not None:
-        # Load data from uploaded file
-        try:
-            df = pd.read_excel(uploaded_file)
-        except Exception as e:
-            st.error(f"Error: {e}")
-            return
-
-        st.write(f"Number of rows in the dataset: {len(df)}")
-
-        # Clean lyrics column
-        df['cleaned_lyrics'] = df['text'].apply(clean_lyrics)
-
-        # Select number of rows to analyze
-        rows_to_analyze = st.number_input("Select number of rows to analyze", min_value=1, max_value=len(df), value=10)
-
-        # Perform sentiment analysis
-        sentiments = []
-        subjectivities = []
-        for i in range(rows_to_analyze):
-            lyric = df.loc[i, 'cleaned_lyrics']
-            sentiment, subjectivity = analyze_sentiment(lyric)
-            sentiments.append(sentiment)
-            subjectivities.append(subjectivity)
-
-        # Add sentiment scores to dataframe
-        df['sentiment_score'] = sentiments
-        df['subjectivity'] = subjectivities
-
-        # Display results
-        st.write(df[['No', 'Song', 'Artist', 'sentiment_score', 'subjectivity']].head(rows_to_analyze))
+    # Input for name
+    input_name = st.text_input('Name:')
+    
+    if st.button('Predict'):
+        if input_name.strip() != '':
+            # Extract features for the input name
+            features = extract_gender_features(input_name)
+            
+            # Predict using the trained classifier
+            predicted_gender = bayes.classify(features)
+            
+            # Display prediction
+            st.success(f'The predicted gender for "{input_name}" is: {predicted_gender}')
+        else:
+            st.warning('Please enter a name.')
 
 if __name__ == '__main__':
     main()
